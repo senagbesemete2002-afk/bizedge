@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bizedge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__left">
+      <button class="icon-button menu-toggle" data-action="toggle-menu" aria-label="Open menu">☰</button>
+      <a class="logo" href="#dashboard"><span class="logo__mark"></span>BIZEDGE</a>
+    </div>
+    <div class="topbar__right">
+      <button class="icon-button" data-action="show-notifications" aria-label="Notifications">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.5-2.5h-5A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5-6.7V3a2 2 0 0 0-4 0v1.3A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>
+      </button>
+      <a class="avatar" id="avatar" href="#settings" aria-label="Settings">S</a>
+    </div>
+  </header>
+
+  <div class="overlay" data-action="close-menu"></div>
+
+  <div class="layout">
+    <nav class="sidebar" aria-label="Main menu">
+      <a class="nav-link" href="#dashboard">🏠 Dashboard</a>
+
+      <h2 class="nav-group">People</h2>
+      <a class="nav-link" href="#employees">Employees</a>
+      <a class="nav-link" href="#recruitment">Recruitment</a>
+      <a class="nav-link" href="#attendance">Attendance</a>
+      <a class="nav-link" href="#leave">Leave</a>
+      <a class="nav-link" href="#training">Training</a>
+
+      <h2 class="nav-group">Finance</h2>
+      <a class="nav-link" href="#payroll">Payroll</a>
+      <a class="nav-link" href="#benefits">Benefits</a>
+      <a class="nav-link" href="#expenses">Expenses</a>
+
+      <h2 class="nav-group">Resources</h2>
+      <a class="nav-link" href="#documents">Documents</a>
+      <a class="nav-link" href="#assets">Assets</a>
+      <a class="nav-link" href="#vehicles">Vehicles</a>
+
+      <hr class="nav-divider">
+      <a class="nav-link" href="#reports">📊 Reports</a>
+      <a class="nav-link" href="#settings">⚙️ Settings</a>
+    </nav>
+
+    <main class="content" id="content"></main>
+  </div>
+
+  <dialog class="dialog" id="add-dialog">
+    <form id="add-form" class="dialog__form"></form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
