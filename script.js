@@ -2,6 +2,8 @@
 
 const STORAGE_KEY = "bizedge-data";
 const NAME_KEY = "bizedge-name";
+const ACCOUNT_KEY = "bizedge-account";
+const SESSION_KEY = "bizedge-signed-in";
 
 // Starting data for every table page
 const DEFAULT_PAGES = {
@@ -186,6 +188,10 @@ let notifications = [];
 let toastTimer;
 let toastAction = null;
 let sort = { column: null, dir: "asc" };
+let currentUserEmail = localStorage.getItem(SESSION_KEY) || "";
+let isAuthenticated = Boolean(currentUserEmail && currentUserEmail !== "true");
+let authView = "signin";
+let authMessage = "";
 
 // ---------- Helpers ----------
 const $ = (selector) => document.querySelector(selector);
@@ -241,19 +247,33 @@ function updateAvatar() {
 }
 
 // ---------- Saving and loading ----------
+function createEmptyPages() {
+  const emptyPages = structuredClone(DEFAULT_PAGES);
+  Object.values(emptyPages).forEach((page) => {
+    page.rows = [];
+  });
+  return emptyPages;
+}
+
+function userStorageKey(key) {
+  return `${key}:${encodeURIComponent(currentUserEmail)}`;
+}
+
 function saveState() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(pages));
-    localStorage.setItem(NAME_KEY, userName);
+    localStorage.setItem(userStorageKey(STORAGE_KEY), JSON.stringify(pages));
+    localStorage.setItem(userStorageKey(NAME_KEY), userName);
   } catch (error) {
     console.warn("Could not save to localStorage", error);
   }
 }
 
 function loadState() {
+  pages = createEmptyPages();
+  notifications = [];
   try {
-    const savedPages = localStorage.getItem(STORAGE_KEY);
-    const savedName = localStorage.getItem(NAME_KEY);
+    const savedPages = localStorage.getItem(userStorageKey(STORAGE_KEY));
+    const savedName = localStorage.getItem(userStorageKey(NAME_KEY));
     if (savedPages) pages = JSON.parse(savedPages);
     if (savedName) userName = savedName;
   } catch (error) {
@@ -271,12 +291,6 @@ function renderDashboard() {
     [awayToday, "Away today"],
     ["28 Oct", "Next payroll"],
     [pages.recruitment.rows.length, "Open roles"],
-  ];
-
-  const attention = [
-    { href: "#leave", title: "2 leave requests waiting", detail: "Zainab Musa, Tunde Bello", label: "Review", tone: "yellow" },
-    { href: "#vehicles", title: "Nissan Navara service is overdue", detail: "Assigned to Tunde Bello", label: "Overdue", tone: "red" },
-    { href: "#expenses", title: "1 expense claim to approve", detail: "Client lunch, ₦38,500", label: "Review", tone: "yellow" },
   ];
 
   const departments = {};
@@ -313,13 +327,7 @@ function renderDashboard() {
       </a>`)
     .join("");
 
-  const attentionHtml = attention
-    .map((item) => `
-      <a class="attention-item" href="${item.href}">
-        <span>${item.title}<small>${item.detail}</small></span>
-        <span class="badge badge--${item.tone}">${item.label}</span>
-      </a>`)
-    .join("");
+  const attentionHtml = `<p class="empty-state">Nothing needs your attention</p>`;
 
   const notificationsHtml = notifications.length
     ? notifications.map((text) => `<div class="attention-item">${escapeHtml(text)}</div>`).join("")
@@ -431,10 +439,148 @@ function renderSettings() {
         </label>
         <div class="form__actions">
           <button class="button button--primary" type="submit">Save changes</button>
-          <button class="button button--secondary" type="button" data-action="reset">Reset sample data</button>
+          <button class="button button--secondary" type="button" data-action="reset">Clear workspace data</button>
         </div>
       </form>
     </section>`;
+}
+
+function renderAuth() {
+  document.body.classList.add("auth-locked");
+  const isSignUp = authView === "signup";
+  const isForgot = authView === "forgot";
+  const title = isSignUp ? "Create your account" : isForgot ? "Reset your password" : "Welcome back";
+  const description = isSignUp
+    ? "Set up your workspace access."
+    : isForgot
+      ? "Choose a new password for your local demo account."
+      : "Sign in to pick up where your team left off.";
+
+  content.innerHTML = `
+    <section class="auth-screen" aria-labelledby="auth-title">
+      <div class="auth-aside">
+        <a class="logo" href="#dashboard" aria-label="Bizedge home"><span class="logo__mark"></span>BIZEDGE</a>
+        <div class="auth-aside__copy">
+          <p class="auth-kicker">People, operations, in focus</p>
+          <h1>Good work starts with a clear view.</h1>
+          <p>Bring your people, payroll and day-to-day operations together in one place.</p>
+        </div>
+        <span class="auth-aside__note">A calmer way to run the work behind the work.</span>
+      </div>
+      <div class="auth-panel">
+        <form class="auth-form" id="auth-form" data-view="${authView}">
+          <p class="auth-kicker">Your Bizedge workspace</p>
+          <h2 id="auth-title">${title}</h2>
+          <p class="auth-description">${description}</p>
+          ${authMessage ? `<p class="auth-message" role="status">${escapeHtml(authMessage)}</p>` : ""}
+          ${isSignUp ? `
+            <label class="auth-label">Your name
+              <input class="field" name="name" autocomplete="name" maxlength="30" required>
+            </label>` : ""}
+          <label class="auth-label">Email address
+            <input class="field" name="email" type="email" autocomplete="email" required>
+          </label>
+          <label class="auth-label">${isForgot ? "New password" : "Password"}
+            <input class="field" name="password" type="password" minlength="8" autocomplete="${isSignUp || isForgot ? "new-password" : "current-password"}" required>
+          </label>
+          ${isSignUp || isForgot ? `
+            <label class="auth-label">Confirm password
+              <input class="field" name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required>
+            </label>` : ""}
+          <button class="button button--primary auth-submit" type="submit">${isSignUp ? "Create account" : isForgot ? "Reset password" : "Sign in"}</button>
+          ${!isSignUp && !isForgot ? `<button class="auth-link auth-forgot" type="button" data-action="auth-view" data-view="forgot">Forgot password?</button>` : ""}
+          <p class="auth-switch">${isSignUp
+            ? `Already have an account? <button class="auth-link" type="button" data-action="auth-view" data-view="signin">Sign in</button>`
+            : isForgot
+              ? `Remembered it? <button class="auth-link" type="button" data-action="auth-view" data-view="signin">Back to sign in</button>`
+              : `New to Bizedge? <button class="auth-link" type="button" data-action="auth-view" data-view="signup">Create an account</button>`}</p>
+          <p class="auth-demo-note">Demo only: account details are stored in this browser. Password reset does not send email; use a test password, not a real one.</p>
+        </form>
+      </div>
+    </section>`;
+}
+
+function readAccounts() {
+  try {
+    const accounts = JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null");
+    if (!accounts) return {};
+    if (accounts.email) return { [accounts.email.toLowerCase()]: accounts };
+    return accounts;
+  } catch {
+    return {};
+  }
+}
+
+function readAccount(email) {
+  return readAccounts()[email] || null;
+}
+
+function saveAccount(account) {
+  const accounts = readAccounts();
+  accounts[account.email] = account;
+  localStorage.setItem(ACCOUNT_KEY, JSON.stringify(accounts));
+}
+
+async function hashPassword(password, salt) {
+  const bytes = new TextEncoder().encode(`${salt}:${password}`);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function createSalt() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const form = event.target;
+  const values = Object.fromEntries(new FormData(form));
+  const email = values.email.trim().toLowerCase();
+  const account = readAccount(email);
+  authMessage = "";
+
+  if (form.dataset.view === "signup") {
+    if (values.password !== values.confirmPassword) authMessage = "Passwords do not match.";
+    else if (account) authMessage = "An account already exists for this email. Sign in instead.";
+    else {
+      const salt = createSalt();
+      userName = values.name.trim();
+      saveAccount({ email, salt, passwordHash: await hashPassword(values.password, salt) });
+      currentUserEmail = email;
+      localStorage.setItem(SESSION_KEY, currentUserEmail);
+      pages = createEmptyPages();
+      notifications = [];
+      saveState();
+      isAuthenticated = true;
+      document.body.classList.remove("auth-locked");
+      location.hash = "#dashboard";
+      route();
+      return;
+    }
+  } else if (form.dataset.view === "forgot") {
+    if (values.password !== values.confirmPassword) authMessage = "Passwords do not match.";
+    else if (!account || account.email !== email) authMessage = "No local demo account matches that email.";
+    else {
+      const salt = createSalt();
+      saveAccount({ ...account, salt, passwordHash: await hashPassword(values.password, salt) });
+      authView = "signin";
+      authMessage = "Password reset in this browser. Sign in with your new password.";
+    }
+  } else if (!account || account.email !== email || account.passwordHash !== await hashPassword(values.password, account.salt)) {
+    authMessage = "Email or password is incorrect.";
+  } else {
+    currentUserEmail = email;
+    localStorage.setItem(SESSION_KEY, currentUserEmail);
+    userName = "Sena";
+    loadState();
+    isAuthenticated = true;
+    document.body.classList.remove("auth-locked");
+    updateAvatar();
+    route();
+    return;
+  }
+
+  renderAuth();
 }
 
 // ---------- Routing (uses the # part of the URL) ----------
@@ -454,6 +600,11 @@ function updateActiveLink(current) {
 }
 
 function route() {
+  if (!isAuthenticated) {
+    renderAuth();
+    return;
+  }
+  document.body.classList.remove("auth-locked");
   let current = getCurrentPage();
   if (current !== "dashboard" && current !== "settings" && !pages[current]) {
     current = "dashboard";
@@ -518,6 +669,19 @@ function handleSettingsSubmit(event) {
 
 // ---------- Events ----------
 const actions = {
+  "auth-view": (button) => {
+    authView = button.dataset.view;
+    authMessage = "";
+    renderAuth();
+  },
+  "sign-out": () => {
+    isAuthenticated = false;
+    currentUserEmail = "";
+    localStorage.removeItem(SESSION_KEY);
+    authView = "signin";
+    authMessage = "";
+    route();
+  },
   "toggle-menu": () => document.body.classList.toggle("menu-open"),
   "close-menu": () => document.body.classList.remove("menu-open"),
   "close-dialog": () => $("#add-dialog").close(),
@@ -553,12 +717,12 @@ const actions = {
     $("#toast").classList.remove("toast--visible");
   },
   reset: () => {
-    if (!confirm("Put all the tables back to how they started?")) return;
-    localStorage.removeItem(STORAGE_KEY);
-    pages = structuredClone(DEFAULT_PAGES);
+    if (!confirm("Clear all data in this workspace? This cannot be undone.")) return;
+    pages = createEmptyPages();
     notifications = [];
+    saveState();
     route();
-    showToast("Sample data restored");
+    showToast("Workspace cleared");
   },
 };
 
@@ -584,6 +748,7 @@ document.addEventListener("input", (event) => {
 });
 
 document.addEventListener("submit", (event) => {
+  if (event.target.id === "auth-form") handleAuthSubmit(event);
   if (event.target.id === "add-form") handleAddSubmit(event);
   if (event.target.id === "settings-form") handleSettingsSubmit(event);
 });
@@ -595,5 +760,5 @@ document.addEventListener("keydown", (event) => {
 window.addEventListener("hashchange", route);
 
 // ---------- Start ----------
-loadState();
+if (isAuthenticated) loadState();
 route();
